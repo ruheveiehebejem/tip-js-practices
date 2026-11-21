@@ -182,9 +182,10 @@ function handleFormSubmit(event) {
     return;
   }
 
+  const wasEditing = editingId !== null;
   currentTasks = result.tasks;
   setFormMode();
-  persistCurrentTasks(editingId === null ? "Задача добавлена." : "Изменения задачи сохранены.");
+  persistCurrentTasks(wasEditing ? "Изменения задачи сохранены." : "Задача добавлена.");
 }
 
 function handleTaskListClick(event) {
