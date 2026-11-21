@@ -1,16 +1,32 @@
-# Demonstration checklist
+# Сценарий демонстрации практической работы № 14
 
-## Before the demo
+## Подготовка
 
-1. Confirm Node.js 24.x and PostgreSQL 18.x.
-2. Confirm the API uses the root `.env` and points at a dedicated demo database.
-3. Confirm schema and seed data are present: 3 categories and 12 tasks.
-4. Start the API and React application from `practice-08` in separate terminals.
-5. Open DevTools Network and keep the console visible.
+Перед показом проверить:
 
-## Variant 8
+1. Установлены Node.js 24.x и PostgreSQL 18.x либо доступен Docker Compose v2.
+2. Файл `.env` настроен на отдельную учебную базу; секреты не попадают в Git и на скриншоты.
+3. Схема и исходные данные загружены: три категории и двенадцать задач.
+4. API запущен. Для показа клиентской части ПР8 открыть её в отдельном терминале.
+5. Открыты терминал и DevTools → Network.
 
-The selected query filters tasks by all three conditions:
+## План показа (8–10 минут)
+
+| Время | Действие | Что демонстрируется | Ожидаемый результат |
+|---:|---|---|---|
+| 0:00–1:00 | Показать версию Node.js, ветку и структуру репозитория | Подготовленное окружение и организация кода | Видны файлы API, тестов и конфигурации. |
+| 1:00–2:00 | Показать health endpoints | Разделение liveness и readiness | Live отвечает 200 без БД; ready отвечает 200 при доступной БД. |
+| 2:00–4:00 | Показать фильтр варианта 8 в клиенте | Запросы к API и результат фильтрации | Изначально видны задачи ID 4 и 34. |
+| 4:00–5:00 | Создать, изменить и удалить задачу варианта 8 | POST, PATCH, DELETE и последующие GET | Новая задача получает ID от сервера; после выполнения она исчезает из фильтра active. |
+| 5:00–6:00 | Показать проверку размера JSON | Параметр `JSON_BODY_LIMIT_BYTES` | Запрос больше лимита получает HTTP 413 `PAYLOAD_TOO_LARGE`. |
+| 6:00–7:00 | Показать логи и заголовок | `X-Request-Id`, структурированная запись | У запроса есть ID; пароль и строка подключения не выводятся. |
+| 7:00–8:00 | Запустить quality gate и DB-тест | Проверяемость результата | Команды проходят; фактический вывод виден в терминале. |
+| 8:00–9:00 | Показать Docker Compose | Контейнеры API и PostgreSQL | Оба контейнера имеют состояние healthy. |
+| 9:00–10:00 | Показать README, CHANGELOG и git tag | Готовность инструкции для другого разработчика | Документы согласованы с командами и версией релиза. |
+
+## Индивидуальный вариант 8
+
+Начальные параметры фильтра:
 
 ```text
 completed=false
@@ -18,39 +34,42 @@ priority=high
 categoryId=2
 ```
 
-Initial task IDs should be 4 and 34.
+Начальная выборка должна содержать ID `[4, 34]`.
 
-1. Create `Подготовить техническое руководство` with priority high and category Project (2).
-2. Show the POST request, 201 response, Location header and server-assigned ID.
-3. Show the follow-up GET request and the new task in the list.
-4. Mark that task completed.
-5. Show the PATCH request and follow-up GET; the task disappears from the active-only filtered list.
-6. Open the task by its ID to show that it still exists and completed is true.
-7. Delete it and show the 204 response and subsequent 404.
+1. Добавить задачу «Подготовить техническое руководство» с высоким приоритетом и категорией «Проект» (ID 2).
+2. Показать POST-запрос, ответ 201, заголовок Location и ID, назначенный сервером.
+3. Показать повторный GET и появление новой задачи в выборке.
+4. Перевести созданную задачу в выполненное состояние.
+5. Показать PATCH и следующий GET: задача пропадает из фильтра, так как фильтр требует `completed=false`.
+6. Получить задачу напрямую по ID и показать, что запись существует и `completed=true`.
+7. Удалить созданную задачу и проверить ответ 204, затем 404 при повторном GET.
 
-Record the actual generated ID from the API response; it may be higher than 35 if the sequence has already advanced.
+ID новой записи считывать из реального ответа API. Не предполагать, что он всегда равен 35: последовательность PostgreSQL могла быть изменена предыдущими проверками.
 
-## Error handling
+## Проверка ограничения JSON
 
-- Submit a task with an invalid category directly to the API and show a validation error.
-- Set `JSON_BODY_LIMIT_BYTES=1024`, restart the API, and submit a request body larger than 1024 bytes. Show HTTP 413 / PAYLOAD_TOO_LARGE.
-- Stop PostgreSQL while the API is running, then show readiness becoming 503. Do not expose the DATABASE_URL in the recording.
+Для отдельного теста выставить `JSON_BODY_LIMIT_BYTES=1024`, перезапустить API и отправить POST с JSON-телом больше 1024 байт. Ожидается HTTP 413 с кодом `PAYLOAD_TOO_LARGE`. В автоматическом тесте лимит передаётся в `createApp` и проверяется реальный HTTP-ответ.
 
-## Release endpoints
+## Проверка недоступности PostgreSQL
 
-- `GET /health/live` returns 200 even while the database is unavailable.
-- `GET /health/ready` returns 200 when PostgreSQL is available and 503 when it is not.
-- Show the request ID header and a single structured JSON request log line.
+Остановить PostgreSQL, пока API остаётся запущенным:
 
-## Evidence to capture
+- `GET /health/live` должен вернуть 200;
+- `GET /health/ready` должен вернуть 503;
+- ответ readiness не должен раскрывать внутреннее сообщение драйвера или параметры подключения.
 
-1. Variant 8 filter and visible task list.
-2. Browser Network entries for POST, PATCH, DELETE and follow-up GET.
-3. Direct 413 response for a request over the configured body limit.
-4. Liveness and readiness responses.
-5. `npm run quality` successful terminal output.
-6. `npm run test:db` successful terminal output.
-7. Docker Compose API and database healthy.
-8. Release version and Git tag after the release gate passes.
+После показа вернуть базу в рабочее состояние.
 
-Do not label expected values as actual results before performing the demo.
+## Материалы для отчёта
+
+Сохранить реальные скриншоты:
+
+1. Фильтр варианта 8 и список задач.
+2. Вкладка Network с POST, PATCH, DELETE и последующими GET.
+3. HTTP 413 на превышение лимита тела.
+4. Ответы liveness и readiness.
+5. Успешный фактический вывод `npm run quality` и `npm run test:db`.
+6. `docker compose ps` с состояниями контейнеров.
+7. Результат GitHub Actions и созданный после успешной проверки Git-тег.
+
+Ожидаемые результаты в этом документе не являются фактическим протоколом запуска. В отчёте указывать только то, что действительно выполнено.
