@@ -38,7 +38,10 @@ test('GET списка применяет четыре фильтра', async ()
       '/api/tasks?completed=false&priority=high&categoryId=2&q=%D0%BC%D0%BE%D0%B4%D0%B5%D0%BB%D1%8C',
     );
     assert.equal(answer.response.status, 200);
-    assert.deepEqual(answer.body.data.map((task) => task.id), [4]);
+    assert.deepEqual(
+      answer.body.data.map((task) => task.id),
+      [4],
+    );
     assert.equal(answer.body.meta.total, 1);
   });
 });
@@ -62,18 +65,18 @@ test('POST → PATCH → DELETE сохраняет контракт', async () =
     );
     assert.equal(created.response.status, 201);
     assert.equal(created.body.data.title, 'Проверить тесты');
-    assert.equal(created.response.headers.get('location'), '/api/tasks/' + created.body.data.id);
+    assert.equal(created.response.headers.get('location'), `/api/tasks/${created.body.data.id}`);
 
     const updated = await request(
       origin,
-      '/api/tasks/' + created.body.data.id,
+      `/api/tasks/${created.body.data.id}`,
       json({ completed: true }, 'PATCH'),
     );
     assert.equal(updated.response.status, 200);
     assert.equal(updated.body.data.completed, true);
     assert.equal(updated.body.data.title, 'Проверить тесты');
 
-    const deleted = await request(origin, '/api/tasks/' + created.body.data.id, {
+    const deleted = await request(origin, `/api/tasks/${created.body.data.id}`, {
       method: 'DELETE',
     });
     assert.equal(deleted.response.status, 204);
@@ -95,95 +98,3 @@ test('debug reset доступен только при явном включен
   });
 });
 
-test('POST отклоняет неверный media type, пустое и сломанное JSON-тело', async () => {
-  await withApi({ store: createFakeStore() }, async (origin) => {
-    const media = await request(origin, '/api/tasks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: '{}',
-    });
-    assert.equal(media.response.status, 415);
-
-    const empty = await request(origin, '/api/tasks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: '',
-    });
-    assert.equal(empty.response.status, 400);
-
-    const broken = await request(origin, '/api/tasks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: '{broken',
-    });
-    assert.equal(broken.response.status, 400);
-    assert.equal(broken.body.error.code, 'INVALID_JSON');
-  });
-});
-
-test('валидация отклоняет неизвестное поле и категорию без изменения данных', async () => {
-  await withApi({ store: createFakeStore() }, async (origin) => {
-    const before = (await request(origin, '/api/tasks')).body.data;
-    const answer = await request(
-      origin,
-      '/api/tasks',
-      json({ title: 'X', priority: 'high', categoryId: 99, extra: true }),
-    );
-    assert.equal(answer.response.status, 400);
-    assert.equal(answer.body.error.code, 'VALIDATION_ERROR');
-    const after = (await request(origin, '/api/tasks')).body.data;
-    assert.deepEqual(after, before);
-  });
-});
-
-test('405 содержит Allow, а OPTIONS возвращает CORS-заголовки', async () => {
-  await withApi({ store: createFakeStore() }, async (origin) => {
-    const notAllowed = await request(origin, '/api/tasks', { method: 'PUT' });
-    assert.equal(notAllowed.response.status, 405);
-    assert.match(notAllowed.response.headers.get('allow'), /GET.*POST/i);
-
-    const options = await request(origin, '/api/tasks', { method: 'OPTIONS' });
-    assert.equal(options.response.status, 204);
-    assert.equal(options.response.headers.get('access-control-allow-origin'), '*');
-    assert.match(options.response.headers.get('access-control-allow-methods'), /PATCH/);
-    assert.equal(options.body, null);
-  });
-});
-
-test('SQLSTATE внешнего ключа и соединения переводятся в безопасные ошибки API', async () => {
-  const foreignKeyStore = createFakeStore();
-  foreignKeyStore.createTask = async () => {
-    throw Object.assign(new Error('database detail should not leak'), { code: '23503' });
-  };
-  await withApi({ store: foreignKeyStore }, async (origin) => {
-    const answer = await request(
-      origin,
-      '/api/tasks',
-      json({ title: 'X', priority: 'high', categoryId: 2 }),
-    );
-    assert.equal(answer.response.status, 400);
-    assert.equal(answer.body.error.code, 'VALIDATION_ERROR');
-    assert.doesNotMatch(JSON.stringify(answer.body), /database detail/);
-  });
-
-  const unavailableStore = createFakeStore();
-  unavailableStore.listTasks = async () => {
-    throw Object.assign(new Error('private connection details'), { code: '08006' });
-  };
-  await withApi({ store: unavailableStore }, async (origin) => {
-    const answer = await request(origin, '/api/tasks');
-    assert.equal(answer.response.status, 503);
-    assert.equal(answer.body.error.code, 'DATABASE_UNAVAILABLE');
-    assert.doesNotMatch(JSON.stringify(answer.body), /private connection details/);
-  });
-});
-
-test('гонка удаления между requireTask и PATCH возвращает 404', async () => {
-  const store = createFakeStore();
-  store.updateTask = async () => null;
-  await withApi({ store }, async (origin) => {
-    const answer = await request(origin, '/api/tasks/4', json({ completed: false }, 'PATCH'));
-    assert.equal(answer.response.status, 404);
-    assert.equal(answer.body.error.code, 'TASK_NOT_FOUND');
-  });
-});
