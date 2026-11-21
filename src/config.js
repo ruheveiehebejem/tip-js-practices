@@ -1,9 +1,9 @@
 const ALLOWED_ENVIRONMENTS = new Set(["development", "test", "production"]);
 const ALLOWED_LEVELS = new Set(["debug", "info", "warn", "error"]);
-const RELEASE_PATTERN = /^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$/;
+const RELEASE_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
 function parsePort(raw) {
-  if (typeof raw !== "string" || !/^\\d+$/.test(raw)) {
+  if (typeof raw !== "string" || !/^\d+$/.test(raw)) {
     throw new Error("API_PORT должен быть целым числом от 1024 до 65535.");
   }
   const value = Number(raw);
@@ -16,13 +16,13 @@ function parsePort(raw) {
 function requiredText(env, key, fallback) {
   const value = env[key] === undefined ? fallback : env[key];
   if (typeof value !== "string" || value.trim() === "") {
-    throw new Error(`${key} не должен быть пустым или состоять из пробелов.`);
+    throw new Error(key + " не должен быть пустым или состоять из пробелов.");
   }
   return value.trim();
 }
 
 function parseBodyLimit(raw) {
-  if (typeof raw !== "string" || !/^\\d+$/.test(raw)) {
+  if (typeof raw !== "string" || !/^\d+$/.test(raw)) {
     throw new Error("JSON_BODY_LIMIT_BYTES должен быть целым числом от 1024 до 1048576.");
   }
   const value = Number(raw);
@@ -35,7 +35,7 @@ function parseBodyLimit(raw) {
 export function readConfig(env = process.env) {
   const connectionString = requiredText(env, "DATABASE_URL", "");
   const host = requiredText(env, "API_HOST", "127.0.0.1");
-  if (/\\s/.test(host)) {
+  if (/\s/.test(host)) {
     throw new Error("API_HOST не должен содержать пробельные символы.");
   }
 
@@ -54,13 +54,16 @@ export function readConfig(env = process.env) {
     throw new Error("RELEASE_VERSION должен иметь формат semver.");
   }
 
-  const enableDebugReset = env.ENABLE_DEBUG_RESET === undefined
-    ? false
-    : env.ENABLE_DEBUG_RESET === "true"
-      ? true
-      : env.ENABLE_DEBUG_RESET === "false"
-        ? false
-        : (() => { throw new Error("ENABLE_DEBUG_RESET должен быть true или false."); })();
+  let enableDebugReset;
+  if (env.ENABLE_DEBUG_RESET === undefined) {
+    enableDebugReset = false;
+  } else if (env.ENABLE_DEBUG_RESET === "true") {
+    enableDebugReset = true;
+  } else if (env.ENABLE_DEBUG_RESET === "false") {
+    enableDebugReset = false;
+  } else {
+    throw new Error("ENABLE_DEBUG_RESET должен быть true или false.");
+  }
 
   if (nodeEnv === "production" && enableDebugReset) {
     throw new Error("ENABLE_DEBUG_RESET запрещён в production.");
