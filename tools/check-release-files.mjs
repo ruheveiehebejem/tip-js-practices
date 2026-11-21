@@ -18,6 +18,7 @@ const required = [
   "src/logger.js",
   "src/lifecycle.js",
   "tests/integration/variant-8.test.js",
+  "tests/integration/release-variant-8.test.js",
 ];
 
 for (const relative of required) {
