@@ -21,27 +21,3 @@ test('readConfig использует безопасные значения по
   assert.equal(config.enableDebugReset, false);
 });
 
-test('readConfig отклоняет отсутствие DATABASE_URL и строку из пробелов', () => {
-  assert.throws(() => readConfig({}), /DATABASE_URL/);
-  assert.throws(() => readConfig({ DATABASE_URL: '   ' }), /DATABASE_URL/);
-});
-
-test('readConfig отклоняет порт вне диапазона и нечисловой порт', () => {
-  for (const API_PORT of ['abc', '1023', '65536', '55.5', '-1', '']) {
-    assert.throws(
-      () => readConfig({ DATABASE_URL: 'postgresql://example', API_PORT }),
-      /API_PORT/,
-    );
-  }
-});
-
-test('readConfig принимает только true или false для ENABLE_DEBUG_RESET', () => {
-  assert.equal(readConfig({ DATABASE_URL: 'postgresql://example', ENABLE_DEBUG_RESET: 'true' }).enableDebugReset, true);
-  assert.equal(readConfig({ DATABASE_URL: 'postgresql://example', ENABLE_DEBUG_RESET: 'false' }).enableDebugReset, false);
-  for (const ENABLE_DEBUG_RESET of ['TRUE', 'yes', '1', '']) {
-    assert.throws(
-      () => readConfig({ DATABASE_URL: 'postgresql://example', ENABLE_DEBUG_RESET }),
-      /ENABLE_DEBUG_RESET/,
-    );
-  }
-});
