@@ -1,5 +1,5 @@
 {
-  "name": "tip-practice-14",
+  "name": "tip-js-task-api",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -13,18 +13,19 @@
     "test:unit": "node --test tests/unit",
     "test:integration": "node --test tests/integration",
     "test:db": "node --test tests/database/postgres.test.js",
-    "test:coverage": "node --experimental-test-coverage --test",
-    "lint": "eslint .",
-    "format": "prettier . --write",
-    "format:check": "prettier . --check",
+    "test:coverage": "node --experimental-test-coverage --test --test-coverage-include=src/**/*.js --test-coverage-lines=85 --test-coverage-functions=85 --test-coverage-branches=75",
+    "lint": "eslint src tests tools",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "check:markers": "node tools/check-test-markers.mjs",
-    "quality": "npm run format:check && npm run lint && npm run check:markers && npm test && npm run check:release",
+    "quality": "npm run format:check && npm run lint && npm run check:markers && npm run test:coverage && npm run check:release",
     "db:prepare": "node --env-file-if-exists=.env tools/prepare-database.mjs",
     "smoke": "node tools/smoke.mjs",
     "release:files": "node tools/check-release-files.mjs",
     "release:check": "npm run quality && npm run test:db && npm run smoke",
     "example": "node --env-file-if-exists=.env examples/persistence.js",
-    "check:release": "node tools/check-release-files.mjs"
+    "check:release": "node tools/check-release-files.mjs",
+    "prepare:db": "node tools/prepare-database.mjs"
   },
   "dependencies": {
     "express": "5.1.0",
