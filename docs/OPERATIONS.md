@@ -1,99 +1,109 @@
-# Operations runbook
+# Эксплуатационная памятка
 
-## Prerequisites
+## Требования
 
-- Node.js 24.x for local development.
-- PostgreSQL 18.x, or Docker Engine with the Compose plugin.
-- A dedicated application role and database. Do not use a personal superuser account for the application.
+- Node.js 24.x для локального запуска.
+- PostgreSQL 18.x либо Docker Engine с плагином Docker Compose v2.
+- Отдельная учебная база и пользователь PostgreSQL с минимально необходимыми правами.
 
-## Local setup
+## Локальная подготовка
 
-1. Create a UTF-8 database and least-privilege login role.
-2. Copy `.env.example` to `.env`.
-3. Set `DATABASE_URL` locally. Never commit .env.
-4. For a new empty database, run `npm run prepare:db`. This creates the schema and inserts the seed data. Do not run it over an existing populated database.
-5. Run `npm ci` and `npm start`.
+1. Создать новую пустую учебную базу и отдельную роль приложения.
+2. Скопировать `.env.example` в `.env`.
+   - PowerShell: `Copy-Item .env.example .env`.
+   - Linux/macOS: `cp .env.example .env`.
+3. В `.env` указать правильный `DATABASE_URL`. Файл `.env` не коммитить.
+4. Установить зависимости: `npm ci`.
+5. Только для новой пустой базы создать схему и данные: `npm run db:prepare`.
+6. Запустить API: `npm start`.
 
-The service binds to `API_HOST:API_PORT`. It does not start listening until the initial database ping succeeds.
+Сервер начинает слушать порт только после успешной первичной проверки подключения к БД.
 
-## Environment variables
+## Переменные окружения
 
-| Variable | Default | Description |
+| Переменная | Значение по умолчанию | Назначение |
 |---|---|---|
-| API_HOST | 127.0.0.1 | Bind address. Use 0.0.0.0 in a container. |
-| API_PORT | 5505 | HTTP port, range 1024–65535. |
-| NODE_ENV | development | development, test or production. |
-| LOG_LEVEL | info | debug, info, warn or error. |
-| RELEASE_VERSION | 1.0.0 | Semantic version included in readiness output. |
-| DATABASE_URL | required | PostgreSQL connection string. Keep secret. |
-| ENABLE_DEBUG_RESET | false | Local-only seed reset; forbidden in production. |
-| JSON_BODY_LIMIT_BYTES | 16384 | Maximum raw JSON request size; range 1024–1048576. |
-| POSTGRES_PASSWORD | compose only | Password used by Docker Compose. |
+| `API_HOST` | `127.0.0.1` | Адрес привязки сервера; в контейнере используется `0.0.0.0`. |
+| `API_PORT` | `5505` | HTTP-порт, допустимый диапазон 1024–65535. |
+| `NODE_ENV` | `development` | Окружение: development, test или production. |
+| `LOG_LEVEL` | `info` | Уровень логирования: debug, info, warn или error. |
+| `RELEASE_VERSION` | `1.0.0` | Версия, отображаемая в readiness. |
+| `DATABASE_URL` | обязательная | Строка подключения PostgreSQL; хранить как секрет. |
+| `ENABLE_DEBUG_RESET` | `false` | Локальный сброс тестовых данных; запрещён в production. |
+| `JSON_BODY_LIMIT_BYTES` | `16384` | Максимальный размер JSON в байтах; диапазон 1024–1048576. |
+| `POSTGRES_PASSWORD` | задаётся пользователем | Пароль БД в конфигурации Docker Compose. |
 
-### Variant 8: request body limit
+### Вариант 8: предел размера тела
 
-Set `JSON_BODY_LIMIT_BYTES` to the maximum allowed JSON body size in bytes. A request over this limit receives HTTP 413 with code `PAYLOAD_TOO_LARGE`. The default is 16 KiB. The value is validated at startup and must be between 1 KiB and 1 MiB. Keep a limit appropriate to the API's task payloads; do not remove it to work around a client error.
+Значение `JSON_BODY_LIMIT_BYTES` проверяется при запуске и передаётся JSON middleware. Запрос, превышающий лимит, получает HTTP 413 и код `PAYLOAD_TOO_LARGE`. Значение по умолчанию — 16 КиБ. Не отключать ограничение для обхода ошибки клиента: следует исправить размер или структуру отправляемого JSON.
 
-## Health checks
+## Проверка состояния
 
-- `GET /health/live` checks that the process responds. It does not query PostgreSQL.
-- `GET /health/ready` executes the database ping. Returns 200 only while the DB is reachable; otherwise 503.
-- `GET /api/health` preserves the application API health contract.
+- `GET /health/live` проверяет, что процесс отвечает. Запрос не обращается к PostgreSQL.
+- `GET /health/ready` проверяет доступность PostgreSQL. При недоступной базе возвращается HTTP 503.
+- `GET /api/health` сохраняет health-контракт API предыдущих практик.
 
-Configure load balancers to use readiness for traffic routing and liveness for process supervision. Readiness failures do not reveal the connection string or driver error.
+Для маршрутизации трафика использовать readiness. Liveness предназначен для контроля процесса. Ответ readiness не раскрывает строку подключения и внутреннюю ошибку драйвера.
 
-## Logging
+## Журналирование
 
-Each request gets an `X-Request-Id` and one JSON log line on response finish. The line includes timestamp, level, event, method, path, status code and duration. Query strings are omitted to avoid accidental logging of search text or secrets.
+Каждый запрос получает заголовок `X-Request-Id` и одну структурированную JSON-запись после завершения ответа. В записи находятся время, уровень, событие, метод, путь, HTTP-статус и длительность. Query string не включается в путь журнала.
 
-Sensitive keys such as password, authorization, cookie, token, connectionString and DATABASE_URL are redacted. Logs go to stdout/stderr so Docker and the process manager can collect them. Avoid adding request bodies or connection strings to logs.
+Чувствительные ключи, включая password, authorization, cookie, token, connectionString и DATABASE_URL, маскируются. Логи поступают в stdout/stderr и доступны через Docker или менеджер процессов. Не добавлять тела запросов и строку подключения в логи.
 
-## Shutdown
+## Корректное завершение
 
-On SIGINT or SIGTERM the process stops accepting new connections, waits for the HTTP server to close, then closes the PostgreSQL pool. Shutdown is idempotent and has a configurable internal timeout. A pool connection acquired by a transaction must always be released in finally.
+При SIGINT или SIGTERM процесс прекращает принимать новые соединения, дожидается закрытия HTTP-сервера, затем закрывает пул PostgreSQL. Операция идемпотентна и ограничена тайм-аутом. Соединение, полученное транзакцией, должно освобождаться в `finally`.
 
-For local development stop with Ctrl+C. For containers use `docker compose down` and allow the container grace period to elapse.
+Локально остановить сервер через Ctrl+C. Для контейнеров использовать `docker compose down`, не прерывая процесс принудительно без необходимости.
 
 ## Docker Compose
 
-1. Copy .env.example to .env.
-2. Set a non-placeholder POSTGRES_PASSWORD.
-3. Run `docker compose up --build -d`.
-4. Wait until both db and api report healthy.
-5. Check `curl http://127.0.0.1:5505/health/ready`.
-6. View logs with `docker compose logs -f api`.
-7. Stop with `docker compose down`.
+1. Скопировать `.env.example` в `.env`.
+2. Задать собственный непустой `POSTGRES_PASSWORD`, отличный от примера.
+3. Запустить: `docker compose up --build -d`.
+4. Проверить состояние: `docker compose ps`.
+5. Проверить readiness: `curl http://127.0.0.1:5505/health/ready`.
+6. Смотреть журналы: `docker compose logs -f api db`.
+7. Остановить: `docker compose down`.
 
-Database files are stored in the named volume `postgres_data`. `docker compose down -v` deletes that volume and all database data; do not use it unless a destructive reset is explicitly intended.
+Данные находятся в именованном томе `postgres_data`. Команда `docker compose down -v` удаляет том и все данные базы. Не выполнять её, если не требуется полный сброс БД.
 
-## Backup and restore
+## Резервное копирование и восстановление
 
-Create a logical backup:
+Создать логическую резервную копию:
 
 ```bash
 pg_dump --format=custom --no-owner --file=tip_tasks.dump "$DATABASE_URL"
 ```
 
-Restore into an empty compatible database:
+Восстановить в пустую совместимую базу:
 
 ```bash
 pg_restore --clean --if-exists --no-owner --dbname="$DATABASE_URL" tip_tasks.dump
 ```
 
-PowerShell users should quote the connection URL and may use the Windows PostgreSQL bin directory for pg_dump/pg_restore. Never put a real password in shell history or screenshots.
+В PowerShell следует правильно заключать строку подключения в кавычки. Не вводить реальный пароль в команды, которые попадут в историю терминала, и не показывать его на скриншотах.
 
-## Database changes
+## Миграции базы
 
-SQL schema and seed scripts are in `sql/`. For a new database, apply schema then seed through `npm run prepare:db`. For an existing database, back it up first and use a forward-only migration. Do not rerun seed blindly: it uses explicit IDs and is designed for an empty database.
+SQL-схема и исходные данные находятся в `sql/`. Для новой базы применить схему и seed через `npm run db:prepare`. Для существующей базы сначала сделать резервную копию и применять отдельные миграции. Seed содержит явные ID и рассчитан на пустые таблицы; повторный запуск поверх существующих данных не допускается.
 
-## Troubleshooting
+## Диагностика
 
-| Symptom | Check |
-|---|---|
-| API does not start | DATABASE_URL, server reachability, credentials and PostgreSQL service. |
-| Readiness is 503 | Check PostgreSQL status and API logs; do not expose connection details. |
-| HTTP 413 | Check JSON_BODY_LIMIT_BYTES and request payload size. |
-| HTTP 415 | Send Content-Type: application/json for POST/PATCH. |
-| Port already in use | Change API_PORT and compose port mapping consistently. |
-| DB test changes data | Run it only against a dedicated disposable test database. |
-| Container restarts | Inspect `docker compose logs api db` and both health statuses. |
+| Симптом | Что проверить | Безопасное действие |
+|---|---|---|
+| API не запускается | `DATABASE_URL`, доступность сервера PostgreSQL, логин и пароль | Проверить выделенную учебную БД и параметры в локальном `.env`; не публиковать строку подключения. |
+| Readiness возвращает 503 | Состояние PostgreSQL и журнал API | Восстановить соединение с БД и повторить запрос readiness. |
+| HTTP 413 | `JSON_BODY_LIMIT_BYTES` и размер JSON | Уменьшить тело запроса либо задать оправданный лимит в разрешённом диапазоне. |
+| HTTP 415 | `Content-Type` | Для POST/PATCH передавать `application/json`. |
+| Порт уже занят | Процесс, использующий `API_PORT` | Остановить конфликтующий процесс или согласованно сменить порт API и Compose. |
+| DB-тест меняет данные | Значение `DATABASE_URL` | Выполнять DB-тест только на отдельной учебной базе; после завершения тест возвращает seed. |
+| Контейнер перезапускается | `docker compose ps` и `docker compose logs api db` | Проверить readiness, переменные окружения и состояние PostgreSQL. |
+
+## Ограничения
+
+- Приложение учебное и не предназначено для публичного production-развёртывания без отдельной проверки безопасности.
+- Аутентификация пользователей, TLS, внешний мониторинг и отказоустойчивый кластер в рамках этой практики не реализованы.
+- `npm run db:prepare` — подготовка пустой базы, а не безопасная миграция существующей базы.
+- `npm run test:db` изменяет тестовые данные и поэтому не должен подключаться к рабочей БД.
