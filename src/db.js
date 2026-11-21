@@ -1,15 +1,21 @@
-import { Pool } from 'pg';
+import pg from "pg";
 
-export function createPool(connectionString) {
+const { Pool } = pg;
+
+export function createPool(connectionString, { logger } = {}) {
   const pool = new Pool({
     connectionString,
     max: 5,
     connectionTimeoutMillis: 3000,
     idleTimeoutMillis: 10000,
-    allowExitOnIdle: true,
   });
-  pool.on('error', (error) =>
-    console.error('Ошибка простаивающего подключения PostgreSQL:', error.message),
-  );
+
+  pool.on("error", (error) => {
+    logger?.error?.("database.pool.error", {
+      code: typeof error?.code === "string" ? error.code : "UNKNOWN",
+      name: error?.name ?? "Error",
+    });
+  });
+
   return pool;
 }
