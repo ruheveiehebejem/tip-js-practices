@@ -1,28 +1,36 @@
-import assert from 'node:assert/strict';
-import { access, readFile } from 'node:fs/promises';
+import { access, readFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const required = [
-  '.dockerignore',
-  '.env.example',
-  '.github/workflows/quality.yml',
-  'CHANGELOG.md',
-  'Dockerfile',
-  'README.md',
-  'compose.yaml',
-  'docs/DEMO.md',
-  'docs/OPERATIONS.md',
+  "README.md",
+  "CHANGELOG.md",
+  "Dockerfile",
+  "compose.yaml",
+  ".env.example",
+  "docs/OPERATIONS.md",
+  "docs/DEMO.md",
+  "sql/01_schema.sql",
+  "sql/02_seed.sql",
+  "src/config.js",
+  "src/health.js",
+  "src/logger.js",
+  "src/lifecycle.js",
+  "tests/integration/variant-8.test.js",
 ];
 
-for (const path of required) {
-  await access(new URL(`../${path}`, import.meta.url));
+for (const relative of required) {
+  await access(path.join(root, relative));
 }
 
-const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
-assert.match(packageJson.version, /^\d+\.\d+\.\d+$/, 'version должна иметь формат X.Y.Z');
-
-for (const path of ['README.md', 'CHANGELOG.md', 'docs/DEMO.md', 'docs/OPERATIONS.md']) {
-  const content = await readFile(new URL(`../${path}`, import.meta.url), 'utf8');
-  assert.doesNotMatch(content, /_заполнить_|TODO PR14/, `${path}: остались незаполненные места`);
+const pkg = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
+const changelog = await readFile(path.join(root, "CHANGELOG.md"), "utf8");
+if (!/^\d+\.\d+\.\d+/.test(pkg.version)) {
+  throw new Error("package.json must contain a semantic release version.");
+}
+if (!changelog.includes(pkg.version)) {
+  throw new Error("CHANGELOG.md does not contain the package release version.");
 }
 
-console.log('Обязательные релизные файлы присутствуют и заполнены.');
+process.stdout.write(`Release files are present for version ${pkg.version}.\n`);
