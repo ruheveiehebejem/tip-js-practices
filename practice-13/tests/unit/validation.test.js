@@ -67,7 +67,50 @@ test('validateTaskInput сохраняет false при частичном об�
   );
 });
 
-test.todo('validateTaskInput отклоняет не-объект, массив и null');
-test.todo('validateTaskInput сообщает обязательные и неизвестные поля POST');
-test.todo('validateTaskInput отклоняет пустой PATCH и несуществующую категорию');
-test.todo('validateTaskInput проверяет границы title, priority и тип completed');
+test('validateTaskInput отклоняет не-объект, массив и null', () => {
+  for (const value of [null, [], 'строка', 10]) {
+    assert.throws(
+      () => validateTaskInput(value, { categoryIds: categories }),
+      (error) => error instanceof ApiError && error.status === 400 && error.code === 'VALIDATION_ERROR',
+    );
+  }
+});
+
+test('validateTaskInput сообщает обязательные и неизвестные поля POST', () => {
+  assert.throws(
+    () => validateTaskInput({ title: 'Название', extra: 1 }, { categoryIds: categories }),
+    (error) => {
+      assert.equal(error.code, 'VALIDATION_ERROR');
+      assert.ok(Object.hasOwn(error.details, 'priority'));
+      assert.ok(Object.hasOwn(error.details, 'categoryId'));
+      assert.ok(Object.hasOwn(error.details, 'extra'));
+      return true;
+    },
+  );
+});
+
+test('validateTaskInput отклоняет пустой PATCH и несуществующую категорию', () => {
+  assert.throws(
+    () => validateTaskInput({}, { partial: true, categoryIds: categories }),
+    (error) => error.details.body !== undefined,
+  );
+  assert.throws(
+    () => validateTaskInput({ categoryId: 99 }, { partial: true, categoryIds: categories }),
+    (error) => error.details.categoryId !== undefined,
+  );
+});
+
+test('validateTaskInput проверяет границы title, priority и тип completed', () => {
+  assert.equal(validateTaskInput({ title: 'x', priority: 'low', categoryId: 1 }, { categoryIds: categories }).title, 'x');
+  assert.equal(validateTaskInput({ title: 'a'.repeat(100), priority: 'high', categoryId: 2 }, { categoryIds: categories }).title.length, 100);
+  for (const title of ['', ' '.repeat(3), 'a'.repeat(101)]) {
+    assert.throws(() => validateTaskInput({ title, priority: 'low', categoryId: 1 }, { categoryIds: categories }));
+  }
+  for (const priority of ['urgent', 'HIGH', 1]) {
+    assert.throws(() => validateTaskInput({ title: 'X', priority, categoryId: 1 }, { categoryIds: categories }));
+  }
+  for (const completed of ['false', 0, null]) {
+    assert.throws(() => validateTaskInput({ completed }, { partial: true, categoryIds: categories }));
+  }
+  assert.deepEqual(validateTaskInput({ completed: false }, { partial: true, categoryIds: categories }), { completed: false });
+});
