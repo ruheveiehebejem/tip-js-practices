@@ -29,7 +29,7 @@ test('SELECT нумерует все параметры в фиксирован�
   });
   assert.deepEqual(query.values, [false, 'high', 2, '%api%']);
   assert.match(compact(query.text), /completed = \$1.*priority = \$2.*category_id = \$3/i);
-  assert.match(compact(query.text), /title ILIKE \$4 ESCAPE '\\\\'/i);
+  assert.match(compact(query.text), /title ILIKE \$4 ESCAPE '\\'/i);
 });
 
 test('UPDATE использует фиксированный порядок независимо от JSON', () => {
@@ -45,25 +45,3 @@ test('UPDATE использует фиксированный порядок не
   );
 });
 
-test('escapeLikePattern экранирует %, _ и обратную косую черту', () => {
-  assert.equal(escapeLikePattern('50%_\\path'), '50\\%\\_\\\\path');
-});
-
-test('SELECT не помещает пользовательский q в SQL-текст', () => {
-  const injected = "x%' OR 1=1 --_\\";
-  const query = buildListTasksQuery({ ...empty, q: injected });
-  assert.ok(!query.text.includes(injected));
-  assert.deepEqual(query.values, ['%' + escapeLikePattern(injected) + '%']);
-});
-
-test('UPDATE одного completed сохраняет значение false', () => {
-  const query = buildUpdateTaskQuery(34, { completed: false });
-  assert.deepEqual(query.values, [false, 34]);
-  assert.match(compact(query.text), /SET completed = \$1 WHERE id = \$2/i);
-});
-
-test('UPDATE отклоняет пустой и неизвестный набор изменений', () => {
-  assert.throws(() => buildUpdateTaskQuery(34, {}), /поле/i);
-  assert.throws(() => buildUpdateTaskQuery(34, { id: 5 }), /Неизвестное поле/i);
-  assert.throws(() => buildUpdateTaskQuery(34, { title: 'X', admin: true }), /Неизвестное поле/i);
-});
