@@ -506,5 +506,31 @@ await check("33. messageForError не раскрывает внутреннюю 
   assert.match(messageForError(new ApiError("x", { kind: "timeout" })), /вовремя/i);
 });
 
+await check("34. Собственная проверка: некорректная категория не меняет черновик", () => {
+  const draft = { title: "  Документация  ", priority: "medium", categoryId: "999" };
+  const before = { ...draft };
+  const result = validateTaskDraft(draft, categories());
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.categoryId);
+  assert.deepEqual(draft, before);
+});
+
+await check("35. Собственная проверка: DELETE отклоняет ответ с неожиданным телом", async () => {
+  const api = createTaskApi({
+    async requestJson() { return { data: { deleted: true } }; },
+  });
+  await expectApiError(() => api.deleteTask(4), "invalid-response");
+});
+
+await check("36. Собственная проверка: cancelEdit возвращает форму в режим создания", async () => {
+  const view = createViewDouble();
+  const controller = createAppController({ api: createApiDouble(), view });
+  await controller.start({});
+  controller.beginEdit(4);
+  controller.cancelEdit();
+  assert.equal(view.formTasks.at(-1), null);
+  assert.deepEqual(view.errors.at(-1), {});
+});
+
 console.log(`\nИтог модулей: успешно ${passed}, ошибок ${failed}.`);
 if (failed > 0) process.exitCode = 1;
