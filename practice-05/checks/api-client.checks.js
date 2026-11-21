@@ -457,5 +457,36 @@ await check("26. loadInitialData передаёт отказ одного из �
   await assert.rejects(() => api.loadInitialData(), (error) => error === source);
 });
 
+await check("27. Собственная проверка: URL сохраняет кириллицу и логическое false", () => {
+  const url = new URL(buildUrl("https://example.test/api", "/tasks", {
+    completed: false,
+    q: "Документация & API",
+  }));
+  assert.equal(url.searchParams.get("completed"), "false");
+  assert.equal(url.searchParams.get("q"), "Документация & API");
+});
+
+await check("28. Собственная проверка: повреждённое тело HTTP-ошибки не меняет kind", async () => {
+  const client = createApiClient({
+    baseUrl: "https://example.test/api",
+    fetchFn: async () => new Response("{broken", {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    }),
+  });
+  const error = await expectApiError(() => client.requestJson("/tasks"), "http");
+  assert.equal(error.status, 500);
+});
+
+await check("29. Собственная проверка: повторяющиеся категории отклоняются", async () => {
+  const item = category();
+  const api = createTaskApi({
+    async requestJson() {
+      return { data: [item, { ...item }], meta: { total: 2 } };
+    },
+  });
+  await expectApiError(() => api.getCategories(), "invalid-response");
+});
+
 console.log(`\nИтог клиента: успешно ${passed}, ошибок ${failed}.`);
 if (failed > 0) process.exitCode = 1;
