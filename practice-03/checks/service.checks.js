@@ -347,6 +347,30 @@ check("35. Работа с другим набором, без зависимо�
   assert.deepEqual(tasks, before);
 });
 
+check("36. Собственная проверка: создание задачи с пробелами по краям", () => {
+  const task = expectTask(createTask(81, "  Подготовить инструкцию  ", "low"));
+  assert.equal(task.title, "Подготовить инструкцию");
+  assert.equal(task.completed, false);
+  assert.equal(task.priority, "low");
+});
+
+check("37. Собственная проверка: неудачное переименование сохраняет данные", () => {
+  const tasks = fixture();
+  const before = copyTasks(tasks);
+  expectFailure(renameTask(tasks, 999, "Новое название"));
+  assert.deepEqual(tasks, before);
+});
+
+check("38. Собственная проверка: завершение последней задачи и удаление", () => {
+  const tasks = [{ id: 55, title: "Подготовить документ", completed: false, priority: "high" }];
+  const completed = expectTasks(setTaskCompleted(tasks, 55, true));
+  assert.deepEqual(getTaskStats(completed), { total: 1, completed: 1, pending: 0, progress: 100 });
+  const empty = expectTasks(removeTask(completed, 55));
+  assert.deepEqual(empty, []);
+  assert.deepEqual(getTaskStats(empty), { total: 0, completed: 0, pending: 0, progress: 0 });
+  assert.equal(tasks[0].completed, false);
+});
+
 // Три собственных проверки можно добавить здесь, до итогового вывода,
 // либо выполнить отдельно и описать в отчёте. Общие проверки удалять не нужно.
 // Пример формы записи (не готовая проверка задания):
