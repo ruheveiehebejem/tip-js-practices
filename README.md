@@ -19,3 +19,4 @@
 - [Практическая работа № 7](./practice-07/README.md) — компонентный интерфейс на React.
 - [Практическая работа № 8](./practice-08/README.md) — работа React-приложения с API.
 - [Практическая работа № 9](./practice-09/README.md) — собственный HTTP API на Express.
+- [Практическая работа № 10](./practice-10/README.md) — CRUD и интеграция React-клиента с собственным API.
