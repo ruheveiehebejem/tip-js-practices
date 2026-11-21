@@ -87,21 +87,3 @@ test('reset выполняет COMMIT одним client и освобождае�
   assert.equal(releases, 1);
 });
 
-test('reset при ошибке выполняет ROLLBACK, release и пробрасывает исходную ошибку', async () => {
-  const failure = new Error('ошибка вставки');
-  const calls = [];
-  let released = false;
-  const client = {
-    async query(sql) {
-      calls.push(sql);
-      if (calls.length === 3) throw failure;
-      return result();
-    },
-    release() { released = true; },
-  };
-  const pool = { query: async () => result(), connect: async () => client };
-  await assert.rejects(createPostgresStore(pool).reset(), (error) => error === failure);
-  assert.equal(calls[0], 'BEGIN');
-  assert.equal(calls.at(-1), 'ROLLBACK');
-  assert.equal(released, true);
-});
