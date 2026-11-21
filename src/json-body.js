@@ -17,7 +17,7 @@ export function createJsonBody(limitBytes = 16 * 1024) {
 
   return [
     (req, res, next) => {
-      if (!/^application\\/json(?:\\s*;|$)/i.test(req.headers["content-type"] ?? "")) {
+      if (!/^application\/json(?:\s*;|$)/i.test(req.headers["content-type"] ?? "")) {
         return next(new ApiError(415, "UNSUPPORTED_MEDIA_TYPE", "Нужен Content-Type application/json."));
       }
       next();
